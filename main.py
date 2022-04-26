@@ -4,8 +4,6 @@ import time
 import PIL.ImageGrab
 import numpy as np
 import imageio
-import cv2 as cv
-import matplotlib.pylab as plt
 
 
 def safe_click():
@@ -14,35 +12,23 @@ def safe_click():
     pos_check = mouse.get_position()
     if pos == pos_check:
         mouse.click('left')
+        time.sleep(2)
     else:
         exit(-1)
 
 
+def move_mouse(target_pos):
+    speed = 1000
+    cur_pos = mouse.get_position()
+    move_time = sum((x1 - x2)**2 for x1, x2 in zip(cur_pos, target_pos))**0.5/speed
+    mouse.move(target_pos[0], target_pos[1], absolute=True, duration=move_time)
+    return
+
+
 def get_grad_feature(image):
     dx, dy = np.gradient(image)
-    return (dx**2 + dy**2)**0.5
-
-
-def detect_object_cv2(screen, target):
-    screenshot = (np.mean(screen, axis=2)).astype(np.float32)
-    target = (np.mean(target, axis=2)).astype(np.float32)
-
-    methods = ['cv.TM_CCOEFF', 'cv.TM_CCOEFF_NORMED', 'cv.TM_CCORR',
-            'cv.TM_CCORR_NORMED', 'cv.TM_SQDIFF', 'cv.TM_SQDIFF_NORMED']
-    method = eval(methods[5])
-
-    res = cv.matchTemplate(screenshot, target, method)
-    min_val, max_val, min_loc, max_loc = cv.minMaxLoc(res)
-    # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum
-    if method in [cv.TM_SQDIFF, cv.TM_SQDIFF_NORMED]:
-        top_left = min_loc
-    else:
-        top_left = max_loc
-
-    top_left = [top_left[1], top_left[0]]
-    click_pos = [x+y//2 for x, y in zip(top_left, target.shape)]
-
-    return click_pos
+    grad = (dx**2 + dy**2)**0.5
+    return grad
 
 
 def detect_object(screen, target):
@@ -55,7 +41,6 @@ def detect_object(screen, target):
     cross_map = np.real(np.fft.ifft2(np.fft.fft2(screenshot)*np.conjugate(np.fft.fft2(target_canvas))))
     pos = np.unravel_index(np.argmax(cross_map), screenshot.shape)
     click_pos = [x+y//2 for x, y in zip(pos, target.shape)]
-
     return click_pos
 
 
@@ -90,7 +75,6 @@ if __name__ == "__main__":
             screenshot = PIL.ImageGrab.grab()
             target = imageio.imread(os.path.join(landmark_folder, f'{step_idx+1}.PNG'))
             click_pos_y, click_pos_x = detect_object(screenshot, target)
-            # click_pos_y, click_pos_x = detect_object_cv2(screenshot, target)
-            mouse.move(click_pos_x/ratio, click_pos_y/ratio, absolute=True, duration=1)
+            move_mouse([click_pos_x/ratio, click_pos_y/ratio])
             safe_click()
 
